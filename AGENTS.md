@@ -28,3 +28,8 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Project rules
+- Study rooms are serverless P2P: PeerJS cloud signalling with deterministic seat ids (`hamgong-v1-<room>-<1..3>`), full mesh, no backend — keeps it free and caps rooms at 3.
+- Shared state (timer, guestbook, BGM) syncs over PeerJS data channels; the newest `version` wins. Timer phase roll-over is computed locally from `endsAt` so peers agree without messages.
+- Pure room rules live in `src/lib/room/*` with vitest tests; UI never re-implements them.
