@@ -165,9 +165,9 @@ function RoomView({
 
       {/* minihompy binder */}
       <div className="bg-binder p-2 pixel-card sm:p-3">
-        <div className="relative grid gap-3 bg-sky-deep/30 p-2 sm:p-3 lg:grid-cols-[280px_1fr]">
+        <div className="relative grid grid-cols-1 gap-3 bg-sky-deep/30 p-2 sm:p-3 lg:grid-cols-[280px_1fr]">
           {/* left page */}
-          <aside className="flex flex-col gap-4 bg-paper p-3 pixel-border">
+          <aside className="flex min-w-0 flex-col gap-4 bg-paper p-3 pixel-border">
             <div className="flex items-center justify-between text-[11px]">
               <span className="font-tiny text-ink-soft">MINIROOM #{room}</span>
               <span className="flex items-center gap-1">
@@ -229,7 +229,7 @@ function RoomView({
           </aside>
 
           {/* right page */}
-          <section id="miniroom" className="flex flex-col bg-paper p-3 pixel-border">
+          <section id="miniroom" className="flex min-w-0 flex-col bg-paper p-3 pixel-border">
             <div className="mb-2 flex items-center justify-between border-b-2 border-dashed border-ink-soft pb-2">
               <h1 className="font-display text-base">
                 <span className="text-cy">✿</span> 우리들의 미니룸
@@ -263,7 +263,7 @@ function RoomView({
       </div>
 
       {/* bottom */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Guestbook entries={sr.guestbook} onAdd={sr.addGuestEntry} />
         <BgmPlayer bgm={sr.bgm} onSet={sr.setBgm} />
       </div>

@@ -56,8 +56,8 @@ function Lobby() {
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-3xl bg-binder p-3 pixel-card sm:p-5">
-        <div className="grid gap-4 bg-paper p-5 pixel-border sm:grid-cols-[1fr_1.1fr] sm:p-8">
-          <div className="flex flex-col items-center justify-center text-center">
+        <div className="grid grid-cols-1 gap-4 bg-paper p-5 pixel-border sm:grid-cols-[1fr_1.1fr] sm:p-8">
+          <div className="flex min-w-0 flex-col items-center justify-center text-center">
             <p className="font-tiny text-[11px] tracking-widest text-ink-soft">TODAY 3 | TOTAL 1,004</p>
             <h1 className="mt-2 font-display text-6xl text-ink">
               함공<span className="text-pink-deep">♥</span>
@@ -80,7 +80,7 @@ function Lobby() {
             </div>
           </div>
 
-          <div className="flex flex-col justify-center gap-5 bg-muted p-4 bg-dashed-page pixel-inset sm:p-6">
+          <div className="flex min-w-0 flex-col justify-center gap-5 bg-muted p-4 bg-dashed-page pixel-inset sm:p-6">
             <label className="block">
               <span className="mb-1.5 block font-display text-sm">내 닉네임</span>
               <input

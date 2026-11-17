@@ -17,7 +17,7 @@ export function PixelPanel({
   id?: string;
 }) {
   return (
-    <section id={id} className={cn("bg-paper pixel-card", className)}>
+    <section id={id} className={cn("min-w-0 bg-paper pixel-card", className)}>
       <header className="flex items-center justify-between gap-2 border-b-[3px] border-ink bg-sky px-3 py-1.5">
         <h2 className="flex items-center gap-1.5 font-display text-sm text-ink">
           {icon}
