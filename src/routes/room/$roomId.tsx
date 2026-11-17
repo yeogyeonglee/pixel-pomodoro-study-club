@@ -11,6 +11,7 @@ import { PomodoroPanel } from "@/components/hamgong/PomodoroPanel";
 import { useStudyRoom, type StudyRoom } from "@/hooks/useStudyRoom";
 import { NAME_KEY, normalizeRoomCode } from "@/lib/room/protocol";
 import { advance } from "@/lib/room/timer";
+import { CAM_PROBLEM_TEXT } from "@/lib/room/camera";
 
 export const Route = createFileRoute("/room/$roomId")({
   head: ({ params }) => ({
@@ -197,7 +198,7 @@ function RoomView({
                   <PixelButton
                     size="icon"
                     tone={me?.camOn ? "mint" : "paper"}
-                    onClick={sr.toggleCam}
+                    onClick={sr.camProblem ? () => void sr.retryCamera() : sr.toggleCam}
                     aria-label={me?.camOn ? "카메라 끄기" : "카메라 켜기"}
                   >
                     {me?.camOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
@@ -236,6 +237,7 @@ function RoomView({
               </h1>
               <span className="text-[11px] text-ink-soft">액자 속 하트를 눌러 응원해요</span>
             </div>
+            {sr.camProblem && <CamProblemBanner sr={sr} />}
             <MiniRoom
               members={sr.members}
               cheers={sr.cheers}
@@ -272,5 +274,34 @@ function RoomView({
         ⓒ 함공 · 영상은 친구들끼리 직접 연결돼요. 회사·학교 와이파이에선 연결이 안 될 수도 있어요.
       </p>
     </main>
+  );
+}
+
+function CamProblemBanner({ sr }: { sr: StudyRoom }) {
+  const [busy, setBusy] = useState(false);
+  const problem = sr.camProblem;
+  if (!problem) return null;
+  const retry = async () => {
+    setBusy(true);
+    const ok = await sr.retryCamera();
+    setBusy(false);
+    if (ok) toast("캠이 켜졌어요! 📷");
+  };
+  return (
+    <div role="alert" className="mb-3 flex flex-col gap-2 bg-butter p-3 pixel-border sm:flex-row sm:items-center">
+      <p className="flex-1 text-xs leading-relaxed">
+        <b className="font-display">📷 내 캠이 안 켜졌어요.</b> {CAM_PROBLEM_TEXT[problem]}
+      </p>
+      <div className="flex shrink-0 gap-2">
+        {problem === "blocked-frame" && (
+          <PixelButton size="sm" tone="cy" onClick={() => window.open(window.location.href, "_blank", "noopener")}>
+            새 탭에서 열기
+          </PixelButton>
+        )}
+        <PixelButton size="sm" tone={problem === "blocked-frame" ? "paper" : "cy"} onClick={retry} disabled={busy}>
+          {busy ? "켜는 중…" : "캠 다시 켜기"}
+        </PixelButton>
+      </div>
+    </div>
   );
 }

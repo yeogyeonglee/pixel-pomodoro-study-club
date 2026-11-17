@@ -22,6 +22,7 @@ import {
   type TimerMode,
   type TimerState,
 } from "@/lib/room/timer";
+import { classifyCamError, isInFrame, VIDEO_CONSTRAINTS, type CamProblem } from "@/lib/room/camera";
 
 export type RoomStatus = "idle" | "media" | "connecting" | "ready" | "full" | "error";
 
@@ -92,19 +93,30 @@ function placeholderStream(name: string): MediaStream {
   return stream;
 }
 
-async function getLocalMedia(name: string): Promise<{ stream: MediaStream; hasCam: boolean }> {
-  const video = { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" };
+async function requestCamera(): Promise<MediaStream> {
+  if (!navigator.mediaDevices?.getUserMedia) throw new TypeError("no mediaDevices");
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video, audio: true });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS, audio: true });
     stream.getAudioTracks().forEach((t) => (t.enabled = false));
-    return { stream, hasCam: true };
-  } catch {
+    return stream;
+  } catch (first) {
+    // Mic may be the blocked/busy device; try camera alone before giving up.
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video });
-      return { stream, hasCam: true };
+      return await navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS });
     } catch {
-      return { stream: placeholderStream(name), hasCam: false };
+      throw first;
     }
+  }
+}
+
+async function getLocalMedia(
+  name: string,
+): Promise<{ stream: MediaStream; hasCam: boolean; problem: CamProblem | null }> {
+  try {
+    return { stream: await requestCamera(), hasCam: true, problem: null };
+  } catch (err) {
+    console.warn("[함공] camera failed", err);
+    return { stream: placeholderStream(name), hasCam: false, problem: classifyCamError(err, isInFrame()) };
   }
 }
 
@@ -117,6 +129,8 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
   const [guestbook, setGuestbook] = useState<GuestEntry[]>([]);
   const [bgm, setBgmState] = useState<BgmState>({ videoId: null, setBy: "", version: 0 });
   const [cheers, setCheers] = useState<Cheer[]>([]);
+  const [camProblem, setCamProblem] = useState<CamProblem | null>(null);
+  const callsRef = useRef(new Map<Slot, MediaConnection>());
 
   const timerRef = useRef(timer);
   const guestRef = useRef(guestbook);
@@ -208,7 +222,7 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
     let cancelled = false;
     let peer: Peer | null = null;
     const conns = connsRef.current;
-    const calls = new Map<Slot, MediaConnection>();
+    const calls = callsRef.current;
 
     const handleMsg = (slot: Slot, msg: PeerMsg) => {
       switch (msg.type) {
@@ -275,7 +289,8 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
     (async () => {
       try {
         setStatus("media");
-        const { stream, hasCam } = await getLocalMedia(nameRef.current);
+        const { stream, hasCam, problem } = await getLocalMedia(nameRef.current);
+        setCamProblem(problem);
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -370,6 +385,7 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
       conns.forEach((c) => c.close());
       conns.clear();
       calls.forEach((c) => c.close());
+      calls.clear();
       peer?.destroy();
       localRef.current.stream?.getTracks().forEach((t) => t.stop());
       localRef.current = { stream: null, camOn: false, micOn: false, hasCam: false };
@@ -443,6 +459,37 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
     sendStatus();
   }, [sendStatus]);
 
+  /** Try the camera again and swap the new tracks into every live call without reconnecting. */
+  const retryCamera = useCallback(async () => {
+    let fresh: MediaStream;
+    try {
+      fresh = await requestCamera();
+    } catch (err) {
+      setCamProblem(classifyCamError(err, isInFrame()));
+      return false;
+    }
+    const l = localRef.current;
+    const old = l.stream;
+    const v = fresh.getVideoTracks()[0];
+    const a = fresh.getAudioTracks()[0];
+    callsRef.current.forEach((call) => {
+      call.peerConnection?.getSenders().forEach((sender) => {
+        if (sender.track?.kind === "video" && v) void sender.replaceTrack(v);
+        if (sender.track?.kind === "audio" && a) void sender.replaceTrack(a);
+      });
+    });
+    old?.getTracks().forEach((t) => t.stop());
+    l.stream = fresh;
+    l.hasCam = true;
+    l.camOn = true;
+    l.micOn = false;
+    const me = mySlotRef.current;
+    if (me) updateMember(me, { stream: fresh });
+    setCamProblem(null);
+    sendStatus();
+    return true;
+  }, [sendStatus, updateMember]);
+
   const toggleMic = useCallback(() => {
     const l = localRef.current;
     if (!l.stream || l.stream.getAudioTracks().length === 0) return;
@@ -474,6 +521,8 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
     toggleCam,
     toggleMic,
     sendCheer,
+    camProblem,
+    retryCamera,
   };
 }
 
