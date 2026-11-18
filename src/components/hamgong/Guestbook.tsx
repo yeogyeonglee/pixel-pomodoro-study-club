@@ -17,9 +17,11 @@ function formatDate(ts: number) {
 export function Guestbook({
   entries,
   onAdd,
+  variant = "guestbook",
 }: {
   entries: GuestEntry[];
   onAdd: (text: string, mood: string) => void;
+  variant?: "guestbook" | "chat";
 }) {
   const [text, setText] = useState("");
   const [mood, setMood] = useState<string>("🌱");
@@ -35,7 +37,7 @@ export function Guestbook({
   return (
     <PixelPanel
       id="guestbook"
-      title="방명록"
+      title={variant === "chat" ? "채팅 · 방명록" : "방명록"}
       icon={<BookHeart className="h-4 w-4" />}
       right={<span className="font-tiny text-[10px] text-ink-soft">TOTAL {entries.length}</span>}
     >
