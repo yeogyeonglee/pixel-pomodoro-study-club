@@ -10,7 +10,8 @@
 @theme inline {
   --font-sans: "Galmuri11", "Galmuri9", ui-monospace, monospace;
   --font-pixel: "Galmuri11", "Galmuri9", ui-monospace, monospace;
-  --font-display: "Galmuri14", "Galmuri11", ui-monospace, monospace;
+  --font-display: var(--theme-font-display);
+  --font-arcade: "Jua", "Galmuri11", sans-serif;
   --font-tiny: "Galmuri9", "Galmuri11", ui-monospace, monospace;
 
   --radius-sm: calc(var(--radius) - 2px);
@@ -55,6 +56,7 @@
   --color-binder: var(--binder);
   --color-screen: var(--screen);
   --color-screen-foreground: var(--screen-foreground);
+  --color-lobby: var(--lobby);
 }
 
 :root {
@@ -83,6 +85,36 @@
   --floor-b: oklch(0.81 0.07 65);
   --dot: oklch(0.97 0.02 228 / 70%);
   --pixel-shadow: oklch(0.36 0.06 262 / 30%);
+  --theme-font-display: "Galmuri14", "Galmuri11", ui-monospace, monospace;
+  --edge-radius: 0px;
+  --page-color: var(--sky);
+  --page-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
+  --page-size: 18px 18px;
+  --lobby: oklch(0.985 0.008 90);
+}
+
+/* Aliases are re-declared on every theme root so they pick up that theme's palette. */
+:root,
+[data-theme] {
+  --edge:
+    0 -3px 0 0 var(--ink),
+    0 3px 0 0 var(--ink),
+    -3px 0 0 0 var(--ink),
+    3px 0 0 0 var(--ink);
+  --edge-card:
+    0 -3px 0 0 var(--ink),
+    0 3px 0 0 var(--ink),
+    -3px 0 0 0 var(--ink),
+    3px 0 0 0 var(--ink),
+    6px 6px 0 0 var(--pixel-shadow),
+    3px 9px 0 0 var(--pixel-shadow),
+    9px 3px 0 0 var(--pixel-shadow);
+  --edge-inset:
+    inset 3px 3px 0 0 var(--pixel-shadow),
+    0 -2px 0 0 var(--ink),
+    0 2px 0 0 var(--ink),
+    -2px 0 0 0 var(--ink),
+    2px 0 0 0 var(--ink);
 
   --background: var(--sky);
   --foreground: var(--ink);
@@ -105,6 +137,42 @@
   --ring: var(--pink-deep);
 }
 
+/* 크아 대기방: bright arcade blues, team colors, chunky rounded game UI */
+[data-theme="crazy"] {
+  --ink: oklch(0.27 0.1 262);
+  --ink-soft: oklch(0.46 0.1 255);
+  --paper: oklch(0.98 0.018 230);
+  --sky: oklch(0.82 0.1 230);
+  --sky-deep: oklch(0.56 0.18 255);
+  --pink: oklch(0.76 0.16 20);
+  --pink-deep: oklch(0.62 0.21 25);
+  --mint: oklch(0.84 0.16 145);
+  --mint-deep: oklch(0.7 0.17 145);
+  --butter: oklch(0.92 0.16 98);
+  --butter-deep: oklch(0.84 0.17 85);
+  --lilac: oklch(0.82 0.08 290);
+  --cy: oklch(0.8 0.16 70);
+  --binder: oklch(0.47 0.17 258);
+  --screen: oklch(0.23 0.07 258);
+  --screen-foreground: oklch(0.93 0.15 98);
+  --pixel-shadow: oklch(0.2 0.09 262 / 55%);
+  --theme-font-display: "Jua", "Galmuri11", sans-serif;
+  --edge-radius: 10px;
+  --page-color: oklch(0.6 0.16 248);
+  --page-image:
+    radial-gradient(oklch(1 0 0 / 22%) 2px, transparent 2.5px),
+    linear-gradient(180deg, oklch(0.74 0.13 232), oklch(0.5 0.17 258));
+  --page-size: 26px 26px, 100% 100%;
+
+  --edge: 0 0 0 3px var(--ink);
+  --edge-card:
+    0 0 0 3px var(--ink),
+    0 6px 0 3px var(--pixel-shadow);
+  --edge-inset:
+    inset 0 3px 0 0 var(--pixel-shadow),
+    0 0 0 2px var(--ink);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -117,39 +185,59 @@
     color: var(--color-foreground);
     font-family: var(--font-pixel);
     word-break: keep-all;
-    background-image: radial-gradient(var(--dot) 1.5px, transparent 1.6px);
-    background-size: 18px 18px;
+    background-color: var(--lobby);
   }
   ::selection {
     background: var(--pink);
   }
 }
 
-/* Notched pixel border (corners stay cut like dot art) */
+/* Theme-aware edges: notched dot-art on 미니홈피, chunky rounded game UI on 크아 */
 @utility pixel-border {
-  box-shadow:
-    0 -3px 0 0 var(--ink),
-    0 3px 0 0 var(--ink),
-    -3px 0 0 0 var(--ink),
-    3px 0 0 0 var(--ink);
+  box-shadow: var(--edge);
+  border-radius: var(--edge-radius);
 }
 @utility pixel-card {
-  box-shadow:
-    0 -3px 0 0 var(--ink),
-    0 3px 0 0 var(--ink),
-    -3px 0 0 0 var(--ink),
-    3px 0 0 0 var(--ink),
-    6px 6px 0 0 var(--pixel-shadow),
-    3px 9px 0 0 var(--pixel-shadow),
-    9px 3px 0 0 var(--pixel-shadow);
+  box-shadow: var(--edge-card);
+  border-radius: var(--edge-radius);
 }
 @utility pixel-inset {
-  box-shadow:
-    inset 3px 3px 0 0 var(--pixel-shadow),
-    0 -2px 0 0 var(--ink),
-    0 2px 0 0 var(--ink),
-    -2px 0 0 0 var(--ink),
-    2px 0 0 0 var(--ink);
+  box-shadow: var(--edge-inset);
+  border-radius: calc(var(--edge-radius) * 0.6);
+}
+@utility theme-page {
+  background-color: var(--page-color);
+  background-image: var(--page-image);
+  background-size: var(--page-size);
+  background-attachment: fixed;
+  color: var(--foreground);
+}
+@utility lobby-card {
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+}
+@utility ca-logo {
+  font-family: var(--font-arcade);
+  color: var(--butter);
+  -webkit-text-stroke: 6px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 5px 0 var(--ink);
+  letter-spacing: 0.02em;
+}
+@utility ca-title-bar {
+  background: linear-gradient(180deg, oklch(0.66 0.17 250), var(--binder));
+  color: var(--paper);
+}
+@utility ca-glass {
+  background: oklch(0.2 0.07 260 / 70%);
+  color: var(--paper);
+}
+@utility ca-closed {
+  background:
+    linear-gradient(45deg, transparent 46%, oklch(0.62 0.21 25 / 80%) 46% 54%, transparent 54%),
+    linear-gradient(-45deg, transparent 46%, oklch(0.62 0.21 25 / 80%) 46% 54%, transparent 54%),
+    oklch(0.35 0.08 258);
 }
 @utility pixelated {
   image-rendering: pixelated;
@@ -241,4 +329,16 @@
 }
 @utility animate-bob {
   animation: bob 1.4s steps(4) infinite;
+}
+@keyframes wobble {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  50% {
+    transform: translateY(-6px) scale(0.96, 1.04);
+  }
+}
+@utility animate-wobble {
+  animation: wobble 1.2s ease-in-out infinite;
 }

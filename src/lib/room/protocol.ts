@@ -1,4 +1,6 @@
 import type { TimerState } from "./timer";
+import type { PresenceKey } from "./presence";
+import type { RoomTheme } from "./theme";
 
 export type Slot = 1 | 2 | 3;
 export const SLOTS: Slot[] = [1, 2, 3];
@@ -34,8 +36,16 @@ export type GuestEntry = {
 export type BgmState = { videoId: string | null; setBy: string; version: number };
 
 export type PeerMsg =
-  | { type: "hello"; name: string; camOn: boolean; micOn: boolean }
-  | { type: "status"; camOn: boolean; micOn: boolean }
+  | {
+      type: "hello";
+      name: string;
+      camOn: boolean;
+      micOn: boolean;
+      presence?: PresenceKey | null;
+      theme?: RoomTheme | null;
+      themeExplicit?: boolean;
+    }
+  | { type: "status"; camOn: boolean; micOn: boolean; presence?: PresenceKey | null }
   | { type: "timer"; state: TimerState }
   | { type: "guestbook"; entries: GuestEntry[] }
   | { type: "bgm"; state: BgmState }

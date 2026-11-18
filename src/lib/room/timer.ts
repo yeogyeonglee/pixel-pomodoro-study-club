@@ -1,7 +1,13 @@
-export const FOCUS_MS = 25 * 60 * 1000;
-export const BREAK_MS = 5 * 60 * 1000;
+const MIN = 60 * 1000;
 
 export type TimerMode = "focus" | "break";
+/** A Pomodoro set: 30 = 25 min focus + 5 min break, 60 = 50 min focus + 10 min break. */
+export type TimerPreset = 30 | 60;
+
+export const PRESETS: Record<TimerPreset, { focus: number; break: number }> = {
+  30: { focus: 25 * MIN, break: 5 * MIN },
+  60: { focus: 50 * MIN, break: 10 * MIN },
+};
 
 export type TimerState = {
   mode: TimerMode;
@@ -12,36 +18,46 @@ export type TimerState = {
   remainingMs: number;
   /** Completed focus sessions. */
   cycles: number;
+  /** Which Pomodoro set the room uses. */
+  preset: TimerPreset;
   /** Last manual change time; the newest version wins when peers sync. */
   version: number;
   by: string;
 };
 
-export const durationOf = (mode: TimerMode) => (mode === "focus" ? FOCUS_MS : BREAK_MS);
+const presetOf = (s: { preset?: TimerPreset }): TimerPreset => (s.preset === 60 ? 60 : 30);
+
+export const durationOf = (mode: TimerMode, preset: TimerPreset = 30) => PRESETS[preset][mode];
 
 export function initialTimer(): TimerState {
   return {
     mode: "focus",
     running: false,
     endsAt: null,
-    remainingMs: FOCUS_MS,
+    remainingMs: PRESETS[30].focus,
     cycles: 0,
+    preset: 30,
     version: 0,
     by: "",
   };
 }
 
+/** Accept states from peers that may predate the preset field. */
+export function normalizeTimer(s: TimerState): TimerState {
+  return s.preset === 30 || s.preset === 60 ? s : { ...s, preset: presetOf(s) };
+}
+
 /** Roll a running timer forward through any phases that already finished. Deterministic per peer. */
 export function advance(s: TimerState, now: number): TimerState {
-  let cur = s;
+  let cur = normalizeTimer(s);
   let guard = 0;
   while (cur.running && cur.endsAt !== null && now >= cur.endsAt && guard < 500) {
     const next: TimerMode = cur.mode === "focus" ? "break" : "focus";
     cur = {
       ...cur,
       mode: next,
-      endsAt: cur.endsAt + durationOf(next),
-      remainingMs: durationOf(next),
+      endsAt: cur.endsAt + durationOf(next, cur.preset),
+      remainingMs: durationOf(next, cur.preset),
       cycles: cur.mode === "focus" ? cur.cycles + 1 : cur.cycles,
     };
     guard++;
@@ -81,7 +97,7 @@ export function resetTimer(s: TimerState, now: number, by: string): TimerState {
     ...cur,
     running: false,
     endsAt: null,
-    remainingMs: durationOf(cur.mode),
+    remainingMs: durationOf(cur.mode, cur.preset),
     version: nextVersion(cur, now),
     by,
   };
@@ -94,7 +110,22 @@ export function switchMode(s: TimerState, mode: TimerMode, now: number, by: stri
     mode,
     running: false,
     endsAt: null,
-    remainingMs: durationOf(mode),
+    remainingMs: durationOf(mode, cur.preset),
+    version: nextVersion(cur, now),
+    by,
+  };
+}
+
+/** Change the set length; starts over from a fresh focus session. */
+export function setPreset(s: TimerState, preset: TimerPreset, now: number, by: string): TimerState {
+  const cur = advance(s, now);
+  return {
+    ...cur,
+    preset,
+    mode: "focus",
+    running: false,
+    endsAt: null,
+    remainingMs: durationOf("focus", preset),
     version: nextVersion(cur, now),
     by,
   };

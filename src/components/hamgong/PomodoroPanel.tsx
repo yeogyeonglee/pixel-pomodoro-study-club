@@ -5,8 +5,10 @@ import {
   advance,
   durationOf,
   formatClock,
+  PRESETS,
   remainingOf,
   type TimerMode,
+  type TimerPreset,
   type TimerState,
 } from "@/lib/room/timer";
 import { playChime } from "@/lib/room/chime";
@@ -24,15 +26,24 @@ export function useTimerView(timer: TimerState) {
   return { view, remaining: remainingOf(view, now) };
 }
 
+const minutes = (ms: number) => Math.round(ms / 60000);
+
 export function PomodoroPanel({
   timer,
   onAction,
+  onPreset,
+  title = "뽀모도로 타이머",
+  startLabel = "다같이 시작",
 }: {
   timer: TimerState;
   onAction: (kind: "start" | "pause" | "reset" | TimerMode) => void;
+  onPreset: (preset: TimerPreset) => void;
+  title?: string;
+  startLabel?: string;
 }) {
   const { view, remaining } = useTimerView(timer);
-  const total = durationOf(view.mode);
+  const total = durationOf(view.mode, view.preset);
+  const set = PRESETS[view.preset];
   const progress = 1 - remaining / total;
   const blocks = 12;
   const filled = Math.round(progress * blocks);
@@ -43,10 +54,14 @@ export function PomodoroPanel({
     const p = prev.current;
     if (p && view.running && (p.mode !== view.mode || p.cycles !== view.cycles)) {
       playChime(view.mode);
-      toast(view.mode === "break" ? "🍅 25분 집중 끝! 5분 쉬어가요" : "✏️ 다시 25분 집중 시작!");
+      toast(
+        view.mode === "break"
+          ? `🍅 ${minutes(set.focus)}분 집중 끝! ${minutes(set.break)}분 쉬어가요`
+          : `✏️ 다시 ${minutes(set.focus)}분 집중 시작!`,
+      );
     }
     prev.current = { mode: view.mode, cycles: view.cycles };
-  }, [view.mode, view.cycles, view.running]);
+  }, [view.mode, view.cycles, view.running, set.focus, set.break]);
 
   useEffect(() => {
     const label = view.mode === "focus" ? "공부중" : "쉬는중";
@@ -54,7 +69,26 @@ export function PomodoroPanel({
   }, [remaining, view.mode, view.running]);
 
   return (
-    <PixelPanel id="timer" title="뽀모도로 타이머" icon={<Timer className="h-4 w-4" />}>
+    <PixelPanel id="timer" title={title} icon={<Timer className="h-4 w-4" />}>
+      <div className="mb-2 grid grid-cols-2 gap-1.5" role="group" aria-label="뽀모도로 세트">
+        {([30, 60] as const).map((p) => (
+          <button
+            key={p}
+            type="button"
+            aria-pressed={view.preset === p}
+            onClick={() => view.preset !== p && onPreset(p)}
+            className={cn(
+              "flex flex-col items-center py-1.5 leading-tight pixel-border",
+              view.preset === p ? "bg-butter" : "bg-paper text-ink-soft hover:bg-muted",
+            )}
+          >
+            <span className="font-display text-sm">{p}분 세트</span>
+            <span className="text-[10px]">
+              공부 {minutes(PRESETS[p].focus)} + 휴식 {minutes(PRESETS[p].break)}
+            </span>
+          </button>
+        ))}
+      </div>
       <div className="flex gap-1">
         {(["focus", "break"] as const).map((m) => (
           <button
@@ -66,7 +100,7 @@ export function PomodoroPanel({
               view.mode === m ? (m === "focus" ? "bg-pink" : "bg-mint") : "bg-muted text-ink-soft",
             )}
           >
-            {m === "focus" ? "공부 25분" : "휴식 5분"}
+            {m === "focus" ? `공부 ${minutes(set.focus)}분` : `휴식 ${minutes(set.break)}분`}
           </button>
         ))}
       </div>
@@ -100,7 +134,7 @@ export function PomodoroPanel({
           </PixelButton>
         ) : (
           <PixelButton tone="cy" className="flex-1" onClick={() => onAction("start")}>
-            <Play className="h-4 w-4" /> 다같이 시작
+            <Play className="h-4 w-4" /> {startLabel}
           </PixelButton>
         )}
         <PixelButton tone="paper" size="icon" className="h-9 w-9" onClick={() => onAction("reset")} aria-label="리셋">

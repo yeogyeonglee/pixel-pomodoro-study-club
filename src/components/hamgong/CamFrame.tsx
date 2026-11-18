@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
-import { Heart, MicOff, VideoOff } from "lucide-react";
+import { Heart, MicOff } from "lucide-react";
 import type { Cheer, Member } from "@/hooks/useStudyRoom";
 import type { Slot } from "@/lib/room/protocol";
 import { cn } from "@/lib/utils";
+import { CamVideo } from "./CamVideo";
 
 const frameTone: Record<Slot, string> = {
   1: "bg-pink",
@@ -10,6 +10,7 @@ const frameTone: Record<Slot, string> = {
   3: "bg-butter",
 };
 
+/** 미니홈피 theme: a cam hung on the wall like a picture frame. */
 export function CamFrame({
   slot,
   member,
@@ -23,47 +24,13 @@ export function CamFrame({
   onCheer: (slot: Slot) => void;
   onInvite: () => void;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.srcObject !== (member?.stream ?? null)) v.srcObject = member?.stream ?? null;
-    if (member?.stream) v.play().catch(() => {});
-  }, [member?.stream]);
-
   return (
     <div className="relative flex flex-col items-center">
-      {/* hanging string */}
       <div className="h-3 w-[2px] bg-ink" aria-hidden />
       <div className={cn("relative w-full p-[6%] pixel-card", frameTone[slot])}>
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-screen pixel-inset">
           {member ? (
-            <>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted={member.isMe}
-                className={cn(
-                  "h-full w-full object-cover",
-                  member.isMe && "-scale-x-100",
-                  !member.camOn && "opacity-0",
-                )}
-              />
-              {!member.camOn && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-screen-foreground">
-                  <VideoOff className="h-5 w-5" />
-                  <span className="font-tiny text-[10px]">잠시 자리비움</span>
-                </div>
-              )}
-              {!member.stream && member.camOn && (
-                <div className="absolute inset-0 flex items-center justify-center font-tiny text-[10px] text-screen-foreground">
-                  연결 중<span className="animate-pixel-blink">_</span>
-                </div>
-              )}
-              <div className="pointer-events-none absolute inset-0 scanlines" aria-hidden />
-            </>
+            <CamVideo member={member} cheers={cheers} />
           ) : (
             <button
               type="button"
@@ -78,18 +45,8 @@ export function CamFrame({
               </span>
             </button>
           )}
-          {cheers.map((c, i) => (
-            <span
-              key={c.id}
-              className="pointer-events-none absolute bottom-2 left-1/2 animate-float-heart text-pink-deep"
-              style={{ ["--drift" as string]: `${((i % 3) - 1) * 18}px` }}
-            >
-              <Heart className="h-5 w-5 fill-current" />
-            </span>
-          ))}
         </div>
       </div>
-      {/* name plate */}
       <div className="mt-2 flex max-w-full items-center gap-1 bg-paper px-2 py-0.5 pixel-border">
         <span className="font-tiny text-[10px] text-ink-soft">No.{slot}</span>
         <span className="truncate font-pixel text-[11px] text-ink">

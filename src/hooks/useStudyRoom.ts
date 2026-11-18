@@ -16,12 +16,17 @@ import {
   initialTimer,
   pauseTimer,
   pickNewer,
+  normalizeTimer,
   resetTimer,
+  setPreset,
   startTimer,
   switchMode,
   type TimerMode,
+  type TimerPreset,
   type TimerState,
 } from "@/lib/room/timer";
+import type { PresenceKey } from "@/lib/room/presence";
+import { parseTheme, shouldAdoptTheme, type RoomTheme } from "@/lib/room/theme";
 import { classifyCamError, isInFrame, VIDEO_CONSTRAINTS, type CamProblem } from "@/lib/room/camera";
 
 export type RoomStatus = "idle" | "media" | "connecting" | "ready" | "full" | "error";
@@ -32,6 +37,7 @@ export type Member = {
   stream: MediaStream | null;
   camOn: boolean;
   micOn: boolean;
+  presence: PresenceKey | null;
   isMe: boolean;
 };
 
@@ -120,7 +126,18 @@ async function getLocalMedia(
   }
 }
 
-export function useStudyRoom(room: string, name: string, enabled: boolean) {
+export function useStudyRoom(
+  room: string,
+  name: string,
+  enabled: boolean,
+  initialTheme: { theme: RoomTheme; explicit: boolean },
+) {
+  const [theme, setTheme] = useState<RoomTheme>(initialTheme.theme);
+  const themeRef = useRef(initialTheme);
+  useEffect(() => {
+    themeRef.current = initialTheme;
+    setTheme(initialTheme.theme);
+  }, [initialTheme.theme, initialTheme.explicit]);
   const [status, setStatus] = useState<RoomStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [mySlot, setMySlot] = useState<Slot | null>(null);
@@ -136,11 +153,18 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
   const guestRef = useRef(guestbook);
   const bgmRef = useRef(bgm);
   const connsRef = useRef(new Map<Slot, DataConnection>());
-  const localRef = useRef<{ stream: MediaStream | null; camOn: boolean; micOn: boolean; hasCam: boolean }>({
+  const localRef = useRef<{
+    stream: MediaStream | null;
+    camOn: boolean;
+    micOn: boolean;
+    hasCam: boolean;
+    presence: PresenceKey | null;
+  }>({
     stream: null,
     camOn: false,
     micOn: false,
     hasCam: false,
+    presence: null,
   });
   const mySlotRef = useRef<Slot | null>(null);
   const nameRef = useRef(name);
@@ -203,6 +227,7 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
         stream: null,
         camOn: true,
         micOn: false,
+        presence: null,
         isMe: false,
       };
       return { ...m, [slot]: { ...prev, ...patch } };
@@ -226,15 +251,36 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
 
     const handleMsg = (slot: Slot, msg: PeerMsg) => {
       switch (msg.type) {
-        case "hello":
-          updateMember(slot, { name: msg.name, camOn: msg.camOn, micOn: msg.micOn });
+        case "hello": {
+          updateMember(slot, {
+            name: msg.name,
+            camOn: msg.camOn,
+            micOn: msg.micOn,
+            presence: msg.presence ?? null,
+          });
+          const theirs = parseTheme(msg.theme);
+          if (
+            theirs &&
+            shouldAdoptTheme({
+              mine: themeRef.current.theme,
+              mineExplicit: themeRef.current.explicit,
+              mySlot: mySlotRef.current ?? 9,
+              theirs,
+              theirsExplicit: !!msg.themeExplicit,
+              theirSlot: slot,
+            })
+          ) {
+            themeRef.current = { theme: theirs, explicit: true };
+            setTheme(theirs);
+          }
           break;
+        }
         case "status":
-          updateMember(slot, { camOn: msg.camOn, micOn: msg.micOn });
+          updateMember(slot, { camOn: msg.camOn, micOn: msg.micOn, presence: msg.presence ?? null });
           break;
         case "timer": {
           const now = Date.now();
-          const merged = pickNewer(advance(timerRef.current, now), advance(msg.state, now));
+          const merged = pickNewer(advance(timerRef.current, now), advance(normalizeTimer(msg.state), now));
           if (merged !== timerRef.current) applyTimer(merged);
           break;
         }
@@ -253,7 +299,15 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
     const setupConn = (conn: DataConnection, slot: Slot) => {
       const onOpen = () => {
         const l = localRef.current;
-        conn.send({ type: "hello", name: nameRef.current, camOn: l.camOn, micOn: l.micOn } satisfies PeerMsg);
+        conn.send({
+          type: "hello",
+          name: nameRef.current,
+          camOn: l.camOn,
+          micOn: l.micOn,
+          presence: l.presence,
+          theme: themeRef.current.theme,
+          themeExplicit: themeRef.current.explicit,
+        } satisfies PeerMsg);
         conn.send({ type: "timer", state: timerRef.current } satisfies PeerMsg);
         conn.send({ type: "guestbook", entries: guestRef.current } satisfies PeerMsg);
         if (bgmRef.current.version > 0) conn.send({ type: "bgm", state: bgmRef.current } satisfies PeerMsg);
@@ -295,7 +349,7 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
-        localRef.current = { stream, camOn: hasCam, micOn: false, hasCam };
+        localRef.current = { stream, camOn: hasCam, micOn: false, hasCam, presence: localRef.current.presence };
 
         setStatus("connecting");
         const { default: PeerClass } = await import("peerjs");
@@ -329,6 +383,7 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
           stream,
           camOn: hasCam,
           micOn: false,
+          presence: localRef.current.presence,
           isMe: true,
         });
 
@@ -388,7 +443,7 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
       calls.clear();
       peer?.destroy();
       localRef.current.stream?.getTracks().forEach((t) => t.stop());
-      localRef.current = { stream: null, camOn: false, micOn: false, hasCam: false };
+      localRef.current = { stream: null, camOn: false, micOn: false, hasCam: false, presence: localRef.current.presence };
       mySlotRef.current = null;
       setMembers({});
       setMySlot(null);
@@ -409,6 +464,15 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
             : kind === "reset"
               ? resetTimer(cur, now, by)
               : switchMode(cur, kind, now, by);
+      applyTimer(next);
+      broadcast({ type: "timer", state: next });
+    },
+    [applyTimer, broadcast],
+  );
+
+  const setTimerPreset = useCallback(
+    (preset: TimerPreset) => {
+      const next = setPreset(timerRef.current, preset, Date.now(), nameRef.current);
       applyTimer(next);
       broadcast({ type: "timer", state: next });
     },
@@ -447,9 +511,17 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
   const sendStatus = useCallback(() => {
     const l = localRef.current;
     const me = mySlotRef.current;
-    if (me) updateMember(me, { camOn: l.camOn, micOn: l.micOn });
-    broadcast({ type: "status", camOn: l.camOn, micOn: l.micOn });
+    if (me) updateMember(me, { camOn: l.camOn, micOn: l.micOn, presence: l.presence });
+    broadcast({ type: "status", camOn: l.camOn, micOn: l.micOn, presence: l.presence });
   }, [broadcast, updateMember]);
+
+  const setPresence = useCallback(
+    (key: PresenceKey | null) => {
+      localRef.current.presence = key;
+      sendStatus();
+    },
+    [sendStatus],
+  );
 
   const toggleCam = useCallback(() => {
     const l = localRef.current;
@@ -523,6 +595,9 @@ export function useStudyRoom(room: string, name: string, enabled: boolean) {
     sendCheer,
     camProblem,
     retryCamera,
+    theme,
+    setPresence,
+    setTimerPreset,
   };
 }
 
